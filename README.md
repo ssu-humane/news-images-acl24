@@ -1,1 +1,1 @@
-# -fake-news-thumbnail_2
+# fake-news-thumbnail_2
