@@ -116,6 +116,6 @@ class Contrastive_Loss4(): # image to text + text to text
         img_to_txt_loss = -torch.log(pos_sim_img_to_txt / (sim_matrix_img_to_txt_pos.sum(dim=-1) + sim_matrix_img_to_txt_neg.sum(dim=-1)))
         txt_to_txt_loss = -torch.log(pos_sim_txt_to_txt / (sim_matrix_txt_to_txt_pos.sum(dim=-1) + sim_matrix_txt_to_txt_neg.sum(dim=-1)))
 
-        loss = (self.gamma*(img_to_txt_loss + txt_to_txt_loss)).mean()
+        loss = ((img_to_txt_loss + (self.gamma*txt_to_txt_loss)).mean())/2
 
         return loss
