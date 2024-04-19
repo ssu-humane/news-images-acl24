@@ -1,124 +1,65 @@
 import torch.nn as nn
-from transformers import CLIPModel
-
-
-class ClassifierBaseLineModel(nn.Module):
-    def __init__(self, config):
-        super(ClassifierBaseLineModel, self).__init__()
-        self.config = config
-        self.clip = CLIPModel.from_pretrained(config.CLIP_MODEL)
-        self.bilinear = nn.Bilinear(config.hidden_size, config.hidden_size, config.intermediate_size)
-        self.relu = nn.ReLU()
-        self.linear = nn.Linear(config.intermediate_size, config.n_cls)
-
-    def all_freeze(self):
-        for name, child in self.clip.named_children():
-            for param in child.parameters():
-                param.requires_grad = False
-
-    def forward(self, input_ids, attention_mask, pixel_values):
-        clip_output = self.clip(input_ids=input_ids, attention_mask=attention_mask, pixel_values=pixel_values)
-        x = self.bilinear(clip_output.text_embeds, clip_output.image_embeds)
-        x = self.relu(x)
-        return self.linear(x)
-
+from transformers import CLIPTextModelWithProjection, CLIPVisionModelWithProjection
+from utils import Output
 
 class ContrastiveBaseLineModel(nn.Module):
     def __init__(self, config):
         super(ContrastiveBaseLineModel, self).__init__()
         self.config = config
-        self.clip = CLIPModel.from_pretrained(config.CLIP_MODEL)
-        self.text_mlp = nn.Sequential(
-            nn.Linear(config.hidden_size, config.intermediate_size),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(config.intermediate_size, config.intermediate_size),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(config.intermediate_size, config.intermediate_size),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(config.intermediate_size, config.hidden_size),
+        self.text_model =  CLIPTextModelWithProjection.from_pretrained(self.config.CLIP_MODEL)
+        self.vision_model = CLIPVisionModelWithProjection.from_pretrained(self.config.CLIP_MODEL)
+
+    def vision_freeze(self):
+        if self.config.VISION_ENCODER_FREEZE == 'all':
+            print('vision all freeze')
+            for idx, (name, param) in enumerate(self.vision_model.named_parameters()):
+                param.requires_grad = False
+        elif self.config.VISION_ENCODER_FREEZE == 0:
+            print('vision 0 layer freeze')
+        elif 1 <= self.config.VISION_ENCODER_FREEZE <= 23:
+            freeze_num = 16 * self.config.VISION_ENCODER_FREEZE + 4
+            print(f'vision {self.config.VISION_ENCODER_FREEZE} layer freeze')
+            for idx, (name, param) in enumerate(self.vision_model.named_parameters()):
+                if 0 <= idx <= freeze_num:
+                    param.requires_grad = False
+        elif self.config.VISION_ENCODER_FREEZE == 24:
+            print('vision 24 layer freeze')
+            for idx, (name, param) in enumerate(self.vision_model.named_parameters()):
+                if 0 <= idx <= 390:
+                    param.requires_grad = False
+    
+    def text_freeze(self):
+        if self.config.TEXT_ENCODER_FREEZE == 'all':
+            print('text all layer freeze')
+            for idx, (name, param) in enumerate(self.text_model.named_parameters()):
+                param.requires_grad = False
+        elif self.config.TEXT_ENCODER_FREEZE == 0:
+            print('text 0 layer freeze')
+        elif 1 <= self.config.TEXT_ENCODER_FREEZE <= 11:
+            freeze_num = 16 * self.config.TEXT_ENCODER_FREEZE + 1 
+            print(f'text {self.config.TEXT_ENCODER_FREEZE} layer freeze')
+            for idx, (name, param) in enumerate(self.text_model.named_parameters()):
+                if 0 <= idx <= freeze_num:
+                    param.requires_grad = False
+        elif self.config.TEXT_ENCODER_FREEZE == 12:
+            print('text 12 layer freeze')
+            for idx, (name, param) in enumerate(self.text_model.named_parameters()):
+                if 0 <= idx <= 195:
+                    param.requires_grad = False
+            
+
+    def forward(self, input_ids, attention_mask, pixel_values):
+        text_outputs = self.text_model(input_ids=input_ids, attention_mask=attention_mask)
+        vision_outputs = self.vision_model(pixel_values=pixel_values)
+
+        text_embeds = text_outputs.text_embeds
+        image_embeds = vision_outputs.image_embeds
+
+        text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
+        image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
+        
+        return Output(
+            text_embeds=text_embeds,
+            image_embeds=image_embeds
         )
-
-    def all_freeze(self):
-        for name, child in self.clip.named_children():
-            for param in child.parameters():
-                param.requires_grad = False
-
-    def vision_freeze(self):
-        if self.config.CLIP_MODEL == "openai/clip-vit-base-patch32":
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if i == 0 or 197 <= i <= 396:
-                    param.requires_grad = False
-        else:
-            print("vision layer freeze: openai/clip-vit-large-patch14")
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if i == 0 or 197 <= i <= 588:
-                    param.requires_grad = False
-
-    def vision_all_text_part_freeze(self):
-        if self.config.TEXT_ENCODER_PART_FREEZE == 3:
-            print(f"TEXT_ENCODER_PART_FREEZE: {self.config.TEXT_ENCODER_PART_FREEZE}")
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if (0 <= i <= 146) or (197 <= i <= 588): # 3
-                    param.requires_grad = False
-        elif self.config.TEXT_ENCODER_PART_FREEZE == 6:
-            print(f"TEXT_ENCODER_PART_FREEZE: {self.config.TEXT_ENCODER_PART_FREEZE}")
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if (0 <= i <= 98) or (197 <= i <= 588): # 6
-                    param.requires_grad = False        
-        elif self.config.TEXT_ENCODER_PART_FREEZE == 9:
-            print(f"TEXT_ENCODER_PART_FREEZE: {self.config.TEXT_ENCODER_PART_FREEZE}")
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if  (0 <= i <= 50) or (197 <= i <= 588): # 9
-                    param.requires_grad = False
-
-    def forward(self, input_ids, attention_mask, pixel_values):
-        clip_output = self.clip(input_ids=input_ids, attention_mask=attention_mask, pixel_values=pixel_values)
-        text_mlp_output = self.text_mlp(clip_output.text_embeds)
-        return text_mlp_output, clip_output.image_embeds
-    
-class CLIPFineT(nn.Module):
-    def __init__(self, config):
-        super(CLIPFineT, self).__init__()
-        self.config = config
-        self.clip = CLIPModel.from_pretrained(config.CLIP_MODEL)
-
-    def all_freeze(self):
-        for name, child in self.clip.named_children():
-            for param in child.parameters():
-                param.requires_grad = False
-    
-    def vision_freeze(self):
-        if self.config.CLIP_MODEL == "openai/clip-vit-base-patch32":
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if i == 0 or 197 <= i <= 396:
-                    param.requires_grad = False
-        else:
-            print("vision layer freeze: openai/clip-vit-large-patch14")
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if i == 0 or 197 <= i <= 588:
-                    param.requires_grad = False
-    def vision_all_text_part_freeze(self):
-        if self.config.TEXT_ENCODER_PART_FREEZE == 3:
-            print(f"TEXT_ENCODER_PART_FREEZE: {self.config.TEXT_ENCODER_PART_FREEZE}")
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if (0 <= i <= 146) or (197 <= i <= 588): # 3
-                    param.requires_grad = False
-        elif self.config.TEXT_ENCODER_PART_FREEZE == 6:
-            print(f"TEXT_ENCODER_PART_FREEZE: {self.config.TEXT_ENCODER_PART_FREEZE}")
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if (0 <= i <= 98) or (197 <= i <= 588): # 6
-                    param.requires_grad = False        
-        elif self.config.TEXT_ENCODER_PART_FREEZE == 9:
-            print(f"TEXT_ENCODER_PART_FREEZE: {self.config.TEXT_ENCODER_PART_FREEZE}")
-            for i, (name, param) in enumerate(self.clip.named_parameters()):
-                if  (0 <= i <= 50) or (197 <= i <= 588): # 9
-                    param.requires_grad = False
-                    
-    def forward(self, input_ids, attention_mask, pixel_values):
-        clip_output = self.clip(input_ids=input_ids, attention_mask=attention_mask, pixel_values=pixel_values)
-        clip_image_embeds = clip_output.image_embeds.detach()
-        text_mlp_output = clip_output.text_embeds
-        return text_mlp_output, clip_image_embeds#clip_output.image_embeds
+        
