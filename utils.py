@@ -2,91 +2,102 @@ import random
 import numpy as np
 import torch
 from tqdm.auto import tqdm
-from config import ModelArguments, DataArguments
 from torch.utils.data import Dataset, DataLoader
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from PIL import Image, ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+import json
+
+from collections import OrderedDict
+from typing import Any, Tuple
+
+def save_args(path, epoch, iteration, ModelArguments, DataArguments):
+    data_path = path+'.json'
+    args = {}
+    args['ModelArguments'] = vars(ModelArguments)
+    args['DataArguments'] = vars(DataArguments)
+    args['best_epoch'] = epoch
+    args['best_iteration'] = iteration
+    with open(data_path, 'w') as f:
+        json.dump(args, f)
+        
+def save_loss(path='checkpoint_loss', loss_data=[]):
+    data_path = path+'.json'
+    args = {}
+    args['loss_data'] = loss_data
+    with open(data_path, 'w') as f:
+        json.dump(args, f)
+
+class ModelOutput(OrderedDict):
+    def __getitem__(self, k):
+        if isinstance(k, str):
+            inner_dict = dict(self.items())
+            return inner_dict[k]
+        else:
+            return self.to_tuple()[k]
+
+    def __setattr__(self, name, value):
+        if name in self.keys() and value is not None:
+            super().__setitem__(name, value)
+        super().__setattr__(name, value)
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        super().__setattr__(key, value)
+        
+    def to_tuple(self) -> Tuple[Any]:
+        return tuple(self[k] for k in self.keys())
+
+class Output(ModelOutput):
+    text_embeds: torch.FloatTensor = None
+    image_embeds: torch.FloatTensor = None
 
 
-class ClassifierDataset(Dataset):
-    def __init__(self, processor, df, img_path = None, org_col=None):
+class ContrastiveDataset(Dataset):
+    def __init__(self, tokenizer, df, img_path = None, img_id = None,org_col=None, neg_col=None):
         super().__init__()
         self.context_length = 77
         self.df = df
-        self.processor = processor
+        self.tokenizer = tokenizer
         self.orgs = []
+        self.negs = [] 
         self.img_path = img_path
+        self.img_id = img_id
         self.org_col = org_col
-
+        self.neg_col = neg_col
+        
         for idx in tqdm(range(len(df))):
-            org = self.df.iloc[idx]
-
-            org_input = self.processor(text=org[self.org_col], return_tensors="pt", padding="max_length",
-                                       max_length=self.context_length)
+            row = self.df.iloc[idx] 
+            
+            o_row = row[self.org_col]
+            org_input = self.tokenizer(text=o_row, return_tensors="pt", padding="max_length",
+                                       max_length=self.context_length, truncation=True)
+            
             org_input['input_ids'] = torch.squeeze(org_input['input_ids'])
             org_input['attention_mask'] = torch.squeeze(org_input['attention_mask'])
-
             self.orgs.append(org_input)
+
+            if self.neg_col != None:
+                n_row = row[self.neg_col]
+                neg_input = self.tokenizer(text=n_row, return_tensors="pt", padding="max_length",
+                                            max_length=self.context_length, truncation=True)
+            
+                neg_input['input_ids'] = torch.squeeze(neg_input['input_ids'])
+                neg_input['attention_mask'] = torch.squeeze(neg_input['attention_mask'])
+                self.negs.append(neg_input)
 
     def __len__(self):
         return len(self.orgs)
 
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        img_input = torch.load(f"{self.img_path}/{row.hash_id}.pt")
-        label = torch.from_numpy(np.asarray(row['label']))
-        return self.orgs[idx], img_input, label
+        img_input = torch.load(f"{self.img_path}/{row[self.img_id]}.pt")
+            
+        if self.neg_col == None:
+            return self.orgs[idx], img_input
+        else:
+            return self.orgs[idx], self.negs[idx], img_input
 
-# 모든 loss에 적용할 수 있도록 코드 수정 필요
-class ContrastiveDataset(Dataset):
-    def __init__(self, processor, df, img_path = None, org_col=None, neg_col=None):
-        super().__init__()
-        self.context_length = 77
-        self.df = df
-        self.processor = processor
-        self.orgs = []
-        self.negs = [] 
-        self.img_path = img_path
-        self.org_col = org_col
-        self.neg_col = neg_col
-        
-        for idx in tqdm(range(len(df))):
-            row = self.df.iloc[idx] # dataFrame에 모두 넣어 두고 분할 할 것인지 각각 분할할 것인지 결정
-            o_row = row[self.org_col]
-            n_row = row[self.neg_col]
-            
-            org_input = self.processor(text=o_row, return_tensors="pt", padding="max_length",
-                                       max_length=self.context_length)
-            
-            org_input['input_ids'] = torch.squeeze(org_input['input_ids'])
-            org_input['attention_mask'] = torch.squeeze(org_input['attention_mask'])
-            
-            
-            neg_input = self.processor(text=n_row, return_tensors="pt", padding="max_length",
-                                       max_length=self.context_length)
-            
-            neg_input['input_ids'] = torch.squeeze(neg_input['input_ids'])
-            neg_input['attention_mask'] = torch.squeeze(neg_input['attention_mask'])
-            
-            self.orgs.append(org_input)
-            self.negs.append(neg_input)
-
-    def __len__(self):
-        return len(self.orgs)
-
-    def __getitem__(self, idx):
-        row = self.df.iat[idx,0]
-        img_input = torch.load(f"{self.img_path}/{row}.pt")
-        return self.orgs[idx], self.negs[idx], img_input
-
-
-    
-def create_data_loader(processor=None, df=None, batch_size=None, num_workers=None, shuffle = None, drop_last=None, org_col=None, neg_col=None,  pin_memory=False):
-    if ModelArguments.TRAIN_MODEL == 'contrastive': 
-        cd = ContrastiveDataset(processor, df, DataArguments.IMAGE_TENSOR, org_col, neg_col)
-    else:
-        cd = ClassifierDataset(processor, df, DataArguments.IMAGE_TENSOR, org_col)
+def create_data_loader(tokenizer=None, df=None, batch_size=None, num_workers=None, shuffle = None, 
+                       drop_last=None, org_col=None, neg_col=None,  pin_memory=False, image_tensor=None, image_id=None):
+    cd = ContrastiveDataset(tokenizer, df, image_tensor, image_id, org_col, neg_col)
 
     return DataLoader(
         cd,
@@ -123,42 +134,67 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-def compute_accuracy(y_target, y_pred):
-    y_pred_tag = y_pred.round()
-    def_acc = accuracy_score(y_target, y_pred_tag)
-    def_f1 = f1_score(y_target, y_pred_tag, average='binary')
-    def_roc = roc_auc_score(y_target, y_pred)
-    return def_acc, def_f1, def_roc
-
-
-def classifier_tuplify_with_device(batch, device):
-    return tuple([batch[0]['input_ids'].to(device, dtype=torch.long),
-                      batch[0]['attention_mask'].to(device, dtype=torch.long),
-                      batch[1].to(device, dtype=torch.float),
-                      batch[2].to(device, dtype=torch.float)])
 
 def contrastive_tuplify_with_device(batch, device):
-    if ModelArguments.Contrastive_Mode == 'imgtotxt':
-        return tuple([batch[0]['input_ids'].to(device, dtype=torch.long),
-                      batch[0]['attention_mask'].to(device, dtype=torch.long),
-                      batch[2].to(device, dtype=torch.float)])
-    elif ModelArguments.Contrastive_Mode == 'imgtotxt_H':
-        return tuple([batch[0]['input_ids'].to(device, dtype=torch.long),
-                      batch[0]['attention_mask'].to(device, dtype=torch.long),
-                      batch[1]['input_ids'].to(device, dtype=torch.long),
-                      batch[1]['attention_mask'].to(device, dtype=torch.long),
-                      batch[2].to(device, dtype=torch.float)])
-    elif ModelArguments.Contrastive_Mode == 'txttotxt_H':
-        return tuple([batch[0]['input_ids'].to(device, dtype=torch.long),
-                      batch[0]['attention_mask'].to(device, dtype=torch.long),
-                      batch[1]['input_ids'].to(device, dtype=torch.long),
-                      batch[1]['attention_mask'].to(device, dtype=torch.long),
-                      batch[2].to(device, dtype=torch.float)])
-    elif ModelArguments.Contrastive_Mode =='imgtotxt_txttotxt_H':
-        return tuple([batch[0]['input_ids'].to(device, dtype=torch.long),
-                      batch[0]['attention_mask'].to(device, dtype=torch.long),
-                      batch[1]['input_ids'].to(device, dtype=torch.long),
-                      batch[1]['attention_mask'].to(device, dtype=torch.long),
-                      batch[2].to(device, dtype=torch.float)])
-    else:
-        return -1
+    return tuple([batch[0]['input_ids'].to(device, dtype=torch.long),
+                    batch[0]['attention_mask'].to(device, dtype=torch.long),
+                    batch[1]['input_ids'].to(device, dtype=torch.long),
+                    batch[1]['attention_mask'].to(device, dtype=torch.long),
+                    batch[2].to(device, dtype=torch.float)])
+    
+    
+class EarlyStopping:
+    """Early stops the training if validation loss doesn't improve after a given patience."""
+    def __init__(self, patience=7, verbose=False, delta=0, path='checkpoint.pt', trace_func=print):
+        """
+        Args:
+            patience (int): How long to wait after last time validation loss improved.
+                            Default: 7
+            verbose (bool): If True, prints a message for each validation loss improvement. 
+                            Default: False
+            delta (float): Minimum change in the monitored quantity to qualify as an improvement.
+                            Default: 0
+            path (str): Path for the checkpoint to be saved to.
+                            Default: 'checkpoint.pt'
+            trace_func (function): trace print function.
+                            Default: print            
+        """
+        self.patience = patience
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = np.Inf
+        self.delta = delta
+        self.path = path
+        self.trace_func = trace_func
+        
+        self.best_epoch = None
+        self.best_iteration = None
+    def __call__(self, val_loss, model, epoch, iteration):
+
+        score = -val_loss
+
+        if self.best_score is None:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model)
+            self.best_epoch = epoch
+            self.best_iteration = iteration
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            self.trace_func(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model)
+            self.best_epoch = epoch
+            self.best_iteration = iteration
+            self.counter = 0
+
+    def save_checkpoint(self, val_loss, model):
+        '''Saves model when validation loss decrease.'''
+        if self.verbose:
+            self.trace_func(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+        torch.save(model.state_dict(), self.path)
+        self.val_loss_min = val_loss
