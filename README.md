@@ -12,17 +12,19 @@ We proposed the CLIP-like vision-language transformer encoder to represent the s
 
 ## Datasets 
 ### Pretraining corpus
-We use the BBC English
+We used the [BBC English dataset](https://aclanthology.org/2023.eacl-main.263/).
 
 ### Evaluation Data: NewsTT
+Our dataset is available upon request. Please contact ""
+
 We introduce a dataset of 1,000 news thumbnail and text for detecting news thumbnail representativeness.
 * Label 1: The thumbnail represents the news text.
 * Label 0: The thumbnail not represents the news text.
-Our dataset is available upon request. Please contact ""
+
 
 ## Usage
 ### CFT-CLIP pretraining
-사전학습 corpus가 존재할 때 아래 순서대로 실행합니다.
+When a pre-training corpus exists, execute it in the order below.
 
 #### counterfeactual text generation
 ```
