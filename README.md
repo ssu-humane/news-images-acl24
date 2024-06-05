@@ -28,7 +28,7 @@ We introduce a dataset of 1,000 news thumbnail and text for detecting news thumb
 When a pre-training corpus exists, execute it in the order below.
 
 #### Counterfeactual text generation
-```
+```shell
 python utils/save_pixel_values.py # Extract pixel values ​​in advance for learning speed
 python utils/get_ntt.py --data_path 'train.pkl' --save_path 'train.pkl' --target_text 'summary' # Extract ntt from news text
 python utils/image_text_cossine_similarity.py --data_path 'train.pkl' --save_path 'train.pkl' --target_text 'summary' # Extract CLIP cossine similarity between image-text pairs
@@ -37,8 +37,28 @@ python utils/counterfactual.py --data_path 'train.pkl' --save_path 'train.pkl' #
 
 #### Trainig
 Set configure using config.py.
-```
+```shell
 python train.py
 ```
+
+### Pretrained CFT-CLIP
+```python3
+import torch
+from PIL import Image
+from transformers import AutoModel, AutoProcessor
+
+processor = AutoProcessor.from_pretrained("humane-lab/cft-clip")
+model = AutoModel.from_pretrained("humane-lab/cft-clip")
+
+
+image = "cat.jpg"
+image = Image.open(image)
+inputs = processor(text=["this is a cat"], images=image, return_tensors="pt")
+
+outputs = model(**inputs)
+text_embeds = outputs.text_embeds
+image_embeds = outputs.image_embeds
+```
+
 ## Dataset usage
 This dataset is shared under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/deed.en). According to this license, you are free to use the dataset as long as you provide appropriate attribution
