@@ -18,7 +18,7 @@ We used the [BBC English dataset](https://aclanthology.org/2023.eacl-main.263/).
 ### Evaluation Data: NewsTT
 Our dataset is available upon request. Please contact "yeayen789@gmail.com"
 
-We introduce a dataset of 1,000 news thumbnail and text for detecting news thumbnail representativeness. The NewsTT
+We introduce a dataset of 1,000 news thumbnail and text for detecting news thumbnail representativeness.
 * Label 1: The thumbnail represents the news text.
 * Label 0: The thumbnail not represents the news text.
 
