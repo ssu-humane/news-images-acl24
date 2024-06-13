@@ -8,7 +8,7 @@ Given a news thumbnail I and its news text T, our task is to predict a binary la
 We present CFT-CLIP, a contrastive learning framework based on counterfactual text. In addition, we implemented this task of assessing thumbnail representativeness in a zero-shot setting no labeled data is available for training, we employ a thresholding classifier based on embedding similarity.
 
 <p align="center"><img src="https://github.com/ssu-humane/fake-news-thumbnail_2/assets/76805677/634d2896-9b8d-428c-8c96-8f5c69a7afbd" width="600" height="400"></p>
-CFT-CLIP is the CLIP-like vision-language transformer encoder to represent the semantics of news thumbnails and news text and it aims to improve the vision and language bi-encoder by contrastive updates involving the counterfactual text generated from an input text. This figure illustrates of the proposed method. Given a pair of a news thumbnail image and an article, the method generates counterfactual news text for being used as negative samples for contrastive learning.
+This figure illustrates of the proposed method. Given a pair of a news thumbnail image and an article text, the method generates counterfactual news text for being used as negative samples for contrastive learning. CFT-CLIP is the CLIP-like vision-language transformer encoder to represent the semantics of news thumbnails and news text and it aims to improve the vision and language bi-encoder by contrastive updates involving the counterfactual text generated from an input text. 
 
 
 ## Datasets 
@@ -18,9 +18,18 @@ We used the [BBC English dataset](https://aclanthology.org/2023.eacl-main.263/).
 ### Evaluation Data: NewsTT
 Our dataset is available upon request. Please contact "yeayen789@gmail.com"
 
+#### Data collection and annotation
 We introduce a dataset of 1,000 news thumbnail and text for detecting news thumbnail representativeness.
+- We collected news thumbnail and news text through random sample not use in training in NELA-GT-2021 dataset.
+- All datasets were annotated two male and one female student from Soongsil University.
+- Labeling guidelines are available in paper Appendix F
+
 * Label 1: The thumbnail represents the news text.
 * Label 0: The thumbnail not represents the news text.
+
+#### Data distribution
+
+#### Data dexcription
 
 
 ## Usage
