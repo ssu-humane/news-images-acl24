@@ -59,7 +59,7 @@ image_embeds = outputs.image_embeds
 
 **Counterfactual text generation**
 
-The pretraining corpus is not provided.
+The pretraining corpus is not provided through the repository due to copyright issues.
 
 ```shell
 python utils/save_pixel_values.py # Extract pixel values ​​in advance for learning speed
