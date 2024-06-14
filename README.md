@@ -58,18 +58,26 @@ image_embeds = outputs.image_embeds
 ### Code for replication
 
 **Counterfactual text generation**
+
+The pretraining corpus is not provided.
+
 ```shell
 python utils/save_pixel_values.py # Extract pixel values ​​in advance for learning speed
 python utils/get_ntt.py --data_path 'train.pkl' --save_path 'train.pkl' --target_text 'summary' # Extract ntt from news text
 python utils/image_text_cossine_similarity.py --data_path 'train.pkl' --save_path 'train.pkl' --target_text 'summary' # Extract CLIP cossine similarity between image-text pairs
 python utils/counterfactual.py --data_path 'train.pkl' --save_path 'train.pkl' # counterfactual text generation 
 ```
+
 **Training**
+
 Set configure using config.py.
+
 ```shell
 python train.py
 ```
+
 **Evaluation**
+
 ```shell
 python evaluation.py --pixel_path "data/pixel_values" ...
 ```
