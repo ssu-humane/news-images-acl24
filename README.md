@@ -1,4 +1,4 @@
-# Assessing News Thumbnail Representativeness (ACL-24)
+# Assessing News Thumbnail Representativeness (ACL 2024)
 
 This repository provides the dataset and code for our paper, "Assessing News Thumbnail Representativeness: Counterfactual text can enhance the cross-matching ability," to be published at ACL 2024.
 
