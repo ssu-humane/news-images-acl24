@@ -42,8 +42,8 @@ import torch
 from PIL import Image
 from transformers import AutoModel, AutoProcessor
 
-processor = AutoProcessor.from_pretrained("humane-lab/cft-clip")
-model = AutoModel.from_pretrained("humane-lab/cft-clip")
+processor = AutoProcessor.from_pretrained("humane-lab/CFT-CLIP")
+model = AutoModel.from_pretrained("humane-lab/CFT-CLIP")
 
 
 image = "cat.jpg"
