@@ -13,6 +13,15 @@ This figure illustrates of the proposed method. Given a pair of a news thumbnail
 
 ## NewsTT
 This dataset is shared under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/deed.en). According to this license, you are free to use the dataset as long as you provide appropriate attribution
+<!--Please use this bib to cite our paper if you use NewsTT in your paper.
+```
+@article{yoon2024assessing,
+  title={Assessing News Thumbnail Representativeness: Counterfactual text can enhance the cross-modal matching ability},
+  author={Yoon, Yejun and Yoon, Seunghyun and Park, Kunwoo},
+  journal={arXiv preprint arXiv:2402.11159},
+  year={2024}
+}
+```!-->
 
 Our dataset is available upon request. Please contact "yeayen789@gmail.com"
 
