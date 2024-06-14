@@ -23,7 +23,7 @@ This dataset is shared under [CC BY-NC 4.0](https://creativecommons.org/licenses
 }
 ```!-->
 
-Our dataset is available upon request. Please contact "yeayen789@gmail.com"
+[Our dataset is available upon request.](https://forms.gle/reGnAXrY84XKLpvc7)
 
 ### Data collection and annotation
 We introduce a dataset of 1,000 news thumbnail and text for detecting news thumbnail representativeness.
